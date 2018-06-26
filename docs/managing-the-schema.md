@@ -1,5 +1,5 @@
 We've taken a look at some of the new approaches available for interacting with data. Of course there are specific circumstances where interacting with the database directly may be necessary.
-  
+
 ## The database adapter
 
 The default database adapter in XF2 is based on MySQL and PHP's mysqli extension. The configured database adapter is accessible in any XF class using the following:
@@ -23,9 +23,9 @@ $username = $user['username'];
 
 !!! warning
     Database queries written directly and passed to the database adapter are not automatically "safe". They pose a risk of a SQL injection vulnerability if user input is not sanitised and not passed into the query without being prepared. The way to do that properly is using prepared statements, like in the example above. Parameters are represented in the query itself using the `?` placeholder. These placeholders are then replaced with the values in the next argument after they have been appropriately escaped. If you have the need to use more than a single parameter, that should be passed into the fetch type method as an array. Should the need arise, you can escape or quote values directly using `$db->quote($value)`.
-  
-    You can find more information about prepared statements [here](http://php.net/manual/en/mysqli.quickstart.prepared-statements.php). 
-    
+
+    You can find more information about prepared statements [here](http://php.net/manual/en/mysqli.quickstart.prepared-statements.php).
+
 It's also possible to query for a single value from a record. For example:
 
 ```php
@@ -51,7 +51,7 @@ Both of these methods will return an array of arrays that represent each user re
 
 !!! note
     If you are using `fetchAllKeyed` note that the second argument is the field to key the array by, but the **third** argument is where you pass in the param values to match the `?` placeholders.
-    
+
 There are some other fetch type methods available including `fetchAllColumn` for grabbing an array of a specific column's values from all returned rows:
 
 ```php
@@ -62,7 +62,7 @@ $usernames = $db->fetchAllColumn('SELECT username FROM xf_user LIMIT 10');
 The above example would return an array of 10 usernames found from the resulting query.
 
 Finally, you may not actually want or need any data returned, in which case you can just do a plain query:
- 
+
 ```php
 $db = \XF::db();
 $db->query('DELETE FROM xf_user WHERE user_id = ?', 1);
@@ -127,3 +127,76 @@ It may not be clear from the alter example, but when changing existing fields, t
 There is some other automatic inference that happens with regards to primary keys. You can explicitly define the primary key (or any other type of key) if you wish, but often auto incremented fields will usually be your primary key for the table. So in the create table example, the `some_id` field is automatically assigned as the primary key for that table.
 
 Finally, for the create table approach, we can automatically add the correct table config for the storage engine specified (which defaults to `InnoDB` but can be changed easily to other engine types).
+
+### SchemaManager common uses
+
+#### tableExists
+
+```php
+$sm = \XF::db()->getSchemaManager();
+if ($sm->tableExists('xf_some_table'))
+{
+    // do something if 'xf_some_table' exists
+}
+```
+
+Checks if a table exists, returns `true` if it does, else `false`.
+
+#### columnExists
+
+```php
+$sm = \XF::db()->getSchemaManager();
+if ($sm->columnExists('xf_some_table', 'some_name', $definition))
+{
+    // do something if 'xf_some_table.some_name' exists
+}
+```
+
+Checks if a column exists in a table, returns `true` if it does, else `false`.
+
+The ```$definition``` is optional and passed in by reference. It will be filled with the column's definition if it exists. This will be an array that contains the schema's column data, for MySQL the keys can be seen [here](https://dev.mysql.com/doc/refman/8.0/en/show-columns.html).
+
+#### alterTable
+
+```php
+$sm = \XF::db()->getSchemaManager();
+$sm->alterTable('xf_some_existing_table', function(\XF\Db\Schema\Alter $table)
+{
+    // use $table to alter the table's schema
+});
+```
+
+As seen above, this needs the table name and a `\Closure` that will receive a `\XF\Db\Schema\Alter` object that will handle the alterations.
+
+#### renameTable
+
+```php
+$sm = \XF::db()->getSchemaManager();
+$sm->renameTable('xf_some_existing_table', 'xf_some_new_table');
+```
+
+This renames the table `xf_some_existing_table` to `xf_some_new_table`.
+
+#### createTable
+
+```php
+$sm = \XF::db()->getSchemaManager();
+$sm->createTable('xf_some_table', function(\XF\Db\Schema\Create $table)
+{
+    // use $table to set the new table's schema
+});
+```
+
+As seen above, this needs the table name and a `\Closure` that will receive a `\XF\Db\Schema\Create` object that will handle the creation.
+
+#### dropTable
+
+```php
+$sm = \XF::db()->getSchemaManager();
+$sm->createTable('xf_some_existing_table', function(\XF\Db\Schema\Drop $table)
+{
+    $table->checkExists(true); // Only drop the table if it exists
+});
+```
+
+This drops the database table `xf_some_existing_table`, deleting the schema and it's contents. A `\Closure` may be given to customize the behavior of the deletion.
